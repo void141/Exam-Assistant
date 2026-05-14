@@ -5,8 +5,8 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { captureScreen } = require('./services/screenshot');
-const { initAI, analyzeScreenshots } = require('./services/ai');
-const { processScreenshotsHybrid } = require('./services/coordinator');
+const aiService = require('./services/ai');
+const coordinator = require('./services/coordinator');
 const ocrService = require('./services/ocr');
 
 let overlayWindow = null;
@@ -105,7 +105,7 @@ function registerHotkeys() {
 
       // Use Opacity 0 instead of hide() to keep the window state stable
       overlayWindow.setOpacity(0.0);
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       const screenshot = await captureScreen();
 
@@ -257,7 +257,7 @@ app.whenReady().then(() => {
     app.quit();
     return;
   }
-  initAI(apiKey);
+  aiService.init(apiKey);
 
   // Create the overlay
   createOverlay();
@@ -283,7 +283,7 @@ app.whenReady().then(() => {
     try {
       overlayWindow.webContents.send('status', 'capturing');
       overlayWindow.setOpacity(0.0);
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       const screenshot = await captureScreen();
       overlayWindow.setOpacity(1.0);
@@ -305,17 +305,24 @@ app.whenReady().then(() => {
     try {
       overlayWindow.webContents.send('status', 'thinking');
       
-      let answer;
+      let answer = "";
       if (useOCR) {
         console.log("🚀 Using Hybrid OCR Pipeline...");
         try {
-          answer = await processScreenshotsHybrid(screenshotQueue);
+          // Process the first screenshot in the queue for hybrid OCR
+          const results = await coordinator.processScreenshot(screenshotQueue[0]);
+          
+          // Execute AI requests for each result part
+          for (const res of results) {
+            const partAnswer = await aiService.ask(res.promptPrefix + " Solve this exam question.", res.payload);
+            answer += partAnswer + "\n\n";
+          }
         } catch (ocrError) {
           console.warn("OCR Pipeline failed, falling back to full vision:", ocrError.message);
-          answer = await analyzeScreenshots(screenshotQueue);
+          answer = await aiService.ask("Solve these exam questions based on the images.", { type: 'vision', images: screenshotQueue });
         }
       } else {
-        answer = await analyzeScreenshots(screenshotQueue);
+        answer = await aiService.ask("Solve these exam questions based on the images.", { type: 'vision', images: screenshotQueue });
       }
 
       overlayWindow.webContents.send('answer', answer);

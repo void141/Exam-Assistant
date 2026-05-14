@@ -73,7 +73,11 @@ class OCRService {
     if (!this.isReady || this.queue.length === 0 || this.currentTask) return;
 
     this.currentTask = this.queue.shift();
-    this.worker.stdin.write(this.currentTask.imagePath + '\n');
+    const request = JSON.stringify({
+      id: Date.now().toString(),
+      image_path: this.currentTask.imagePath
+    });
+    this.worker.stdin.write(request + '\n');
   }
 
   async runOCR(imagePath) {
