@@ -1,0 +1,26 @@
+{
+  "name": "exam-assistant",
+  "version": "1.0.0",
+  "description": "AI exam assistant with invisible overlay",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.exam.assistant",
+    "productName": "ExamAssistant",
+    "win": {
+      "target": "portable"
+    }
+  }
+}
