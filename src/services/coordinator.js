@@ -26,19 +26,16 @@ async function safeUnlink(filePath, retries = 5, delayMs = 200) {
 
 class Coordinator {
   async processScreenshot(base64) {
-    const tempPath = path.join(process.cwd(), `temp_ocr_${Date.now()}.jpg`);
+    const tempPath = path.join(process.cwd(), `temp_ocr_${Date.now()}.png`);
     const results = [];
 
     try {
-      // 1. Convert to JPEG and Save (Forces white background for transparency)
-      // Ensure we strip the Data URL prefix if it exists
+      // 1. Save as PNG (Preserves alpha for Pillow to handle)
       const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, "");
       const buffer = Buffer.from(cleanBase64, 'base64');
       
-      await sharp(buffer)
-        .flatten({ background: { r: 255, g: 255, b: 255 } }) 
-        .jpeg({ quality: 90 })
-        .toFile(tempPath);
+      // We write as PNG to avoid the black-flattening in toJPEG
+      await fs.promises.writeFile(tempPath, buffer);
       
       // Safety delay to ensure file is flushed
       await new Promise(r => setTimeout(r, 200));
@@ -82,6 +79,7 @@ class Coordinator {
         }
 
         const jpegBuffer = await sharpInstance
+          .flatten({ background: { r: 255, g: 255, b: 255 } })
           .jpeg({ quality: 60 })
           .toBuffer();
         
