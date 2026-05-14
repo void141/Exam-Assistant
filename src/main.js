@@ -6,12 +6,15 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { captureScreen } = require('./services/screenshot');
 const { initAI, analyzeScreenshots } = require('./services/ai');
+const { processScreenshotsHybrid } = require('./services/coordinator');
+const ocrService = require('./services/ocr');
 
 let overlayWindow = null;
 let tray = null;
 let isClickThrough = true;
 let isVisible = true;
 let isQuitting = false;
+let useOCR = true; // NEW: Control the hybrid pipeline
 let screenshotQueue = [];
 
 /**
@@ -19,6 +22,7 @@ let screenshotQueue = [];
  * This window is visible on the physical monitor but INVISIBLE to screen capture.
  */
 function createOverlay() {
+  ocrService.init();
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
   // HIDDEN PARENT TRICK: On Windows, the most reliable way to hide from the taskbar
@@ -300,7 +304,20 @@ app.whenReady().then(() => {
 
     try {
       overlayWindow.webContents.send('status', 'thinking');
-      const answer = await analyzeScreenshots(screenshotQueue);
+      
+      let answer;
+      if (useOCR) {
+        console.log("🚀 Using Hybrid OCR Pipeline...");
+        try {
+          answer = await processScreenshotsHybrid(screenshotQueue);
+        } catch (ocrError) {
+          console.warn("OCR Pipeline failed, falling back to full vision:", ocrError.message);
+          answer = await analyzeScreenshots(screenshotQueue);
+        }
+      } else {
+        answer = await analyzeScreenshots(screenshotQueue);
+      }
+
       overlayWindow.webContents.send('answer', answer);
       overlayWindow.webContents.send('status', 'ready');
       // Clear queue after sending
@@ -354,6 +371,7 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  ocrService.stop();
   globalShortcut.unregisterAll();
 });
 

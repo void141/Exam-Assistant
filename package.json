@@ -4,7 +4,7 @@
   "description": "AI exam assistant with invisible overlay",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "chcp 65001 > nul && electron .",
     "dev": "electron . --dev",
     "build": "electron-builder --win portable"
   },
